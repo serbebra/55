@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DecentralizedPuzzle {
+    struct Puzzle {
+        bytes32 hash;
+        uint256 difficulty;
+        uint256 reward;
+        uint256 expirationTime;
+        address solver;
+        bool solved;
+    }
+
+    uint256 public currentPuzzleIndex;
+    mapping(uint256 => Puzzle) public puzzles;
+
+    event PuzzleCreated(uint256 indexed index, bytes32 hash, uint256 difficulty, uint256 reward, uint256 expirationTime);
+    event PuzzleSolved(uint256 indexed index, address indexed solver, bytes32 solution);
+
+    constructor() {}
+
+    function createPuzzle(bytes32 _hash, uint256 _difficulty, uint256 _reward, uint256 _duration) external {
+        require(_duration > 0, "Duration must be greater than zero");
+
+        Puzzle storage puzzle = puzzles[currentPuzzleIndex];
+        puzzle.hash = _hash;
+        puzzle.difficulty = _difficulty;
+        puzzle.reward = _reward;
+        puzzle.expirationTime = block.timestamp + _duration;
+        
+        emit PuzzleCreated(currentPuzzleIndex, _hash, _difficulty, _reward, puzzle.expirationTime);
+
+        currentPuzzleIndex++;
+    }
+
+    function solvePuzzle(uint256 _puzzleIndex, bytes32 _solution) external {
+        Puzzle storage puzzle = puzzles[_puzzleIndex];
+        require(!puzzle.solved, "Puzzle already solved");
+        require(block.timestamp <= puzzle.expirationTime, "Puzzle expired");
+
+        require(keccak256(abi.encodePacked(_solution)) == puzzle.hash, "Incorrect solution");
+        
+        puzzle.solved = true;
+        puzzle.solver = msg.sender;
+
+        emit PuzzleSolved(_puzzleIndex, msg.sender, _solution);
+
+        // Transfer reward to the solver
+        payable(msg.sender).transfer(puzzle.reward);
+    }
+
+    function getPuzzleCount() external view returns (uint256) {
+        return currentPuzzleIndex;
+    }
+}
